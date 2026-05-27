@@ -1,0 +1,394 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<AGENTS version="1.0" project="FlavorForge" phase="backend">
+
+  <!-- ============================================================
+       GLOBAL CONTEXT
+       Shared rules every agent must follow.
+  ============================================================ -->
+  <context>
+    <project_name>FlavorForge</project_name>
+    <phase>backend</phase>
+    <stack>
+      <language>Python 3.10+</language>
+      <framework>Flask</framework>
+      <database>SQLite3 (file: flavorforge.db)</database>
+      <orm>None — raw sqlite3 module only</orm>
+    </stack>
+    <goals>
+      <goal>Build a working backend that supports recipe storage, ingredient matching, and cuisine fusion queries.</goal>
+      <goal>Keep it simple. No auth, no migrations, no ORM. This is an MVP for academic demonstration.</goal>
+      <goal>All routes return HTML snippets, not JSON. HTMX on the frontend will consume them.</goal>
+    </goals>
+    <constraints>
+      <constraint>Do NOT use SQLAlchemy or any ORM.</constraint>
+      <constraint>Do NOT use FTS5 virtual tables. Removed from scope.</constraint>
+      <constraint>Do NOT add security middleware, rate limiting, or input sanitization beyond basic SQL safety.</constraint>
+      <constraint>Every db connection must be opened and closed within the route function that uses it. No global connection objects.</constraint>
+      <constraint>Use render_template for full HTML files. Use render_template_string for inline HTML snippets returned by routes.</constraint>
+      <constraint>Run flask with debug=True.</constraint>
+    </constraints>
+  </context>
+
+  <!-- ============================================================
+       AGENT 1: DATABASE SCHEMA AGENT
+       Responsible for init_db.py only.
+  ============================================================ -->
+  <agent id="1" name="DatabaseSchemaAgent">
+    <responsibility>Create init_db.py. This script builds the schema and seeds the database. It runs once before the app starts.</responsibility>
+
+    <output_file>init_db.py</output_file>
+
+    <instructions>
+
+      <step id="1.1" name="connect">
+        Connect to flavorforge.db using sqlite3.connect("flavorforge.db").
+        Use a context manager (with statement) so the connection closes cleanly.
+      </step>
+
+      <step id="1.2" name="create_tables">
+        Execute CREATE TABLE IF NOT EXISTS for each table below, in this exact order to respect foreign key dependencies.
+
+        <table name="Recipes">
+          <column name="id" type="INTEGER" constraints="PRIMARY KEY AUTOINCREMENT"/>
+          <column name="name" type="TEXT" constraints="NOT NULL"/>
+          <column name="instructions" type="TEXT" constraints="NOT NULL"/>
+        </table>
+
+        <table name="Ingredients">
+          <column name="id" type="INTEGER" constraints="PRIMARY KEY AUTOINCREMENT"/>
+          <column name="name" type="TEXT" constraints="NOT NULL UNIQUE"/>
+        </table>
+
+        <table name="Cuisines">
+          <column name="id" type="INTEGER" constraints="PRIMARY KEY AUTOINCREMENT"/>
+          <column name="name" type="TEXT" constraints="NOT NULL UNIQUE"/>
+        </table>
+
+        <table name="Recipe_Ingredients">
+          <column name="recipe_id" type="INTEGER" constraints="NOT NULL REFERENCES Recipes(id)"/>
+          <column name="ingredient_id" type="INTEGER" constraints="NOT NULL REFERENCES Ingredients(id)"/>
+          <primary_key type="composite" columns="recipe_id, ingredient_id"/>
+        </table>
+
+        <table name="Recipe_Cuisines">
+          <column name="recipe_id" type="INTEGER" constraints="NOT NULL REFERENCES Recipes(id)"/>
+          <column name="cuisine_id" type="INTEGER" constraints="NOT NULL REFERENCES Cuisines(id)"/>
+          <primary_key type="composite" columns="recipe_id, cuisine_id"/>
+        </table>
+      </step>
+
+      <step id="1.3" name="seed_cuisines">
+        Insert exactly 3 cuisines using INSERT OR IGNORE INTO Cuisines (name) VALUES (?).
+        <seed_values>
+          <value>Italian</value>
+          <value>Indian</value>
+          <value>Mexican</value>
+        </seed_values>
+      </step>
+
+      <step id="1.4" name="seed_ingredients">
+        Insert exactly 10 ingredients using INSERT OR IGNORE INTO Ingredients (name) VALUES (?).
+        <seed_values>
+          <value>tomato</value>
+          <value>garlic</value>
+          <value>onion</value>
+          <value>chicken</value>
+          <value>cumin</value>
+          <value>cheese</value>
+          <value>pasta</value>
+          <value>chili</value>
+          <value>olive oil</value>
+          <value>garam masala</value>
+        </seed_values>
+      </step>
+
+      <step id="1.5" name="seed_recipes">
+        Insert exactly 5 recipes into the Recipes table.
+        Capture the lastrowid for each insert to use in junction table seeding.
+        <seed_values>
+          <recipe name="Pasta Pomodoro" ingredients="tomato,garlic,pasta,olive oil" cuisine="Italian"/>
+          <recipe name="Chicken Tikka" ingredients="chicken,garlic,garam masala,onion" cuisine="Indian"/>
+          <recipe name="Tacos al Carbon" ingredients="chicken,cumin,chili,onion" cuisine="Mexican"/>
+          <recipe name="Margherita Base" ingredients="tomato,garlic,cheese,olive oil" cuisine="Italian"/>
+          <recipe name="Dal Tadka" ingredients="cumin,garlic,onion,garam masala" cuisine="Indian"/>
+        </seed_values>
+      </step>
+
+      <step id="1.6" name="seed_junction_tables">
+        For each recipe seeded in step 1.5:
+        - Look up ingredient ids from Ingredients table by name.
+        - Insert into Recipe_Ingredients (recipe_id, ingredient_id) for each ingredient.
+        - Look up cuisine id from Cuisines table by name.
+        - Insert into Recipe_Cuisines (recipe_id, cuisine_id).
+        Use INSERT OR IGNORE to avoid duplicate key errors on re-runs.
+      </step>
+
+      <step id="1.7" name="commit_and_close">
+        Call conn.commit() after all inserts.
+        Print "Database initialized successfully." to stdout on completion.
+      </step>
+
+    </instructions>
+
+    <validation>
+      <check>Running python init_db.py twice must not throw errors (IF NOT EXISTS and INSERT OR IGNORE handle idempotency).</check>
+      <check>flavorforge.db must exist after the script runs.</check>
+      <check>All 5 tables must exist with correct columns.</check>
+      <check>Recipes table must have 5 rows. Ingredients must have 10. Cuisines must have 3.</check>
+      <check>Recipe_Ingredients and Recipe_Cuisines must have the correct number of rows matching seed data.</check>
+    </validation>
+  </agent>
+
+  <!-- ============================================================
+       AGENT 2: FLASK APP AGENT
+       Responsible for app.py only.
+  ============================================================ -->
+  <agent id="2" name="FlaskAppAgent">
+    <responsibility>Create app.py. This is the Flask application with all four routes. Depends on Agent 1 having already created the database.</responsibility>
+
+    <output_file>app.py</output_file>
+
+    <dependencies>
+      <dependency agent_id="1">flavorforge.db must exist before this app starts.</dependency>
+    </dependencies>
+
+    <imports>
+      <import>import sqlite3</import>
+      <import>from flask import Flask, request, render_template, render_template_string</import>
+    </imports>
+
+    <app_setup>
+      Define app = Flask(__name__).
+      Define a helper function get_db_connection() that returns a sqlite3.connect("flavorforge.db") connection with row_factory set to sqlite3.Row so columns are accessible by name.
+    </app_setup>
+
+    <routes>
+
+      <route id="2.1" method="GET" path="/">
+        <description>Serves the main page.</description>
+        <logic>
+          Return render_template("index.html").
+          No database call needed.
+        </logic>
+        <returns>Full HTML page.</returns>
+      </route>
+
+      <route id="2.2" method="POST" path="/add_recipe">
+        <description>Adds a new recipe with ingredients and cuisine to the database.</description>
+        <inputs>
+          <input name="recipe_name" source="request.form" type="string"/>
+          <input name="ingredients[]" source="request.form.getlist('ingredients[]')" type="list of strings"/>
+          <input name="cuisine" source="request.form" type="string"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>INSERT INTO Recipes (name, instructions) VALUES (recipe_name, '') and capture lastrowid as recipe_id.</step>
+          <step>
+            For each ingredient in the ingredients list:
+            - Strip whitespace. Skip if empty string.
+            - INSERT OR IGNORE INTO Ingredients (name) VALUES (ingredient).
+            - SELECT id FROM Ingredients WHERE name = ingredient to get ingredient_id.
+            - INSERT OR IGNORE INTO Recipe_Ingredients (recipe_id, ingredient_id) VALUES (recipe_id, ingredient_id).
+          </step>
+          <step>
+            For the cuisine string:
+            - INSERT OR IGNORE INTO Cuisines (name) VALUES (cuisine).
+            - SELECT id FROM Cuisines WHERE name = cuisine to get cuisine_id.
+            - INSERT OR IGNORE INTO Recipe_Cuisines (recipe_id, cuisine_id) VALUES (recipe_id, cuisine_id).
+          </step>
+          <step>Commit and close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet string using render_template_string.
+          Format: a single table row.
+          Example: &lt;tr&gt;&lt;td&gt;{recipe_name}&lt;/td&gt;&lt;td&gt;Added&lt;/td&gt;&lt;/tr&gt;
+        </returns>
+      </route>
+
+      <route id="2.3" method="POST" path="/predictive_match">
+        <description>
+          Takes a list of ingredients the user has on hand.
+          Returns recipes ranked by how many of those ingredients they contain.
+        </description>
+        <inputs>
+          <input name="ingredients[]" source="request.form.getlist('ingredients[]')" type="list of strings"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>
+            Clean the ingredients list: strip whitespace, filter empty strings, lowercase all values.
+          </step>
+          <step>
+            Build a parameterized SQL query.
+            Use a placeholder string for the IN clause based on the length of the list.
+            Example placeholder: (?, ?, ?) for 3 ingredients.
+
+            SQL pattern:
+            SELECT r.name, COUNT(i.name) as match_count
+            FROM Recipes r
+            JOIN Recipe_Ingredients ri ON r.id = ri.recipe_id
+            JOIN Ingredients i ON ri.ingredient_id = i.id
+            WHERE LOWER(i.name) IN ({placeholders})
+            GROUP BY r.id
+            ORDER BY match_count DESC
+          </step>
+          <step>Fetch all results.</step>
+          <step>Close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet using render_template_string.
+          An unordered list of results.
+          Each list item shows recipe name and match count.
+          Example: &lt;li&gt;Pasta Pomodoro — 3 ingredients matched&lt;/li&gt;
+          If no results: &lt;li&gt;No matching recipes found.&lt;/li&gt;
+        </returns>
+      </route>
+
+      <route id="2.4" method="POST" path="/cultural_fusion">
+        <description>
+          Takes two cuisine names.
+          Returns recipes that belong to BOTH cuisines simultaneously.
+          Uses a double-join with HAVING COUNT = 2 strategy.
+        </description>
+        <inputs>
+          <input name="cuisine_a" source="request.form" type="string"/>
+          <input name="cuisine_b" source="request.form" type="string"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>
+            SQL pattern:
+            SELECT r.name
+            FROM Recipes r
+            JOIN Recipe_Cuisines rc ON r.id = rc.recipe_id
+            JOIN Cuisines c ON rc.cuisine_id = c.id
+            WHERE c.name IN (cuisine_a, cuisine_b)
+            GROUP BY r.id
+            HAVING COUNT(DISTINCT c.id) = 2
+
+            Use parameterized query: WHERE c.name IN (?, ?) with (cuisine_a, cuisine_b) as params.
+          </step>
+          <step>Fetch all results.</step>
+          <step>Close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet using render_template_string.
+          A div with a heading and a list of recipe names.
+          Example:
+          &lt;div&gt;
+            &lt;strong&gt;Fusion: Italian + Indian&lt;/strong&gt;
+            &lt;ul&gt;&lt;li&gt;Recipe Name&lt;/li&gt;&lt;/ul&gt;
+          &lt;/div&gt;
+          If no results: &lt;p&gt;No fusion recipes found for these two cuisines.&lt;/p&gt;
+        </returns>
+      </route>
+
+    </routes>
+
+    <app_runner>
+      At the bottom of app.py, under if __name__ == "__main__":
+      Call app.run(debug=True).
+    </app_runner>
+
+    <validation>
+      <check>python app.py must start without errors after init_db.py has been run.</check>
+      <check>GET / must return HTTP 200.</check>
+      <check>POST /add_recipe with valid form data must return a table row HTML string and persist the recipe in the db.</check>
+      <check>POST /predictive_match with ingredients that exist in seed data must return at least one list item.</check>
+      <check>POST /cultural_fusion with cuisine_a=Italian and cuisine_b=Indian must return the fusion div (may be empty list if no cross-cuisine recipes in seed data — that is acceptable).</check>
+      <check>No route should crash on empty input. Handle empty lists gracefully.</check>
+    </validation>
+  </agent>
+
+  <!-- ============================================================
+       AGENT 3: INTEGRATION VALIDATION AGENT
+       Runs after Agents 1 and 2 are complete.
+       Does not write code. Only validates the backend end-to-end.
+  ============================================================ -->
+  <agent id="3" name="IntegrationValidationAgent">
+    <responsibility>
+      Verify the full backend pipeline works correctly before frontend work begins.
+      This agent does not create files. It runs checks only.
+    </responsibility>
+
+    <dependencies>
+      <dependency agent_id="1">init_db.py must have been executed successfully.</dependency>
+      <dependency agent_id="2">app.py must be running on http://127.0.0.1:5000.</dependency>
+    </dependencies>
+
+    <checks>
+
+      <check id="3.1" name="db_exists">
+        Assert flavorforge.db exists in the project root.
+      </check>
+
+      <check id="3.2" name="table_row_counts">
+        Open flavorforge.db and verify:
+        - SELECT COUNT(*) FROM Recipes = 5
+        - SELECT COUNT(*) FROM Ingredients = 10
+        - SELECT COUNT(*) FROM Cuisines = 3
+        - SELECT COUNT(*) FROM Recipe_Ingredients is greater than 0
+        - SELECT COUNT(*) FROM Recipe_Cuisines is greater than 0
+      </check>
+
+      <check id="3.3" name="route_get_home">
+        Send GET http://127.0.0.1:5000/
+        Assert HTTP 200 response.
+      </check>
+
+      <check id="3.4" name="route_add_recipe">
+        Send POST http://127.0.0.1:5000/add_recipe with form data:
+        - recipe_name = "Test Recipe"
+        - ingredients[] = "tomato"
+        - ingredients[] = "garlic"
+        - cuisine = "Italian"
+        Assert response contains "Test Recipe".
+        Assert Recipes table now has 6 rows.
+      </check>
+
+      <check id="3.5" name="route_predictive_match">
+        Send POST http://127.0.0.1:5000/predictive_match with form data:
+        - ingredients[] = "tomato"
+        - ingredients[] = "garlic"
+        Assert response contains at least one &lt;li&gt; element.
+        Assert response does not crash (HTTP 200).
+      </check>
+
+      <check id="3.6" name="route_cultural_fusion">
+        Send POST http://127.0.0.1:5000/cultural_fusion with form data:
+        - cuisine_a = "Italian"
+        - cuisine_b = "Indian"
+        Assert HTTP 200 response.
+        Assert response contains either a recipe name or the no-results message.
+        Neither outcome is a failure — empty fusion result is valid given seed data.
+      </check>
+
+      <check id="3.7" name="empty_input_safety">
+        Send POST /predictive_match with an empty ingredients[] list.
+        Assert HTTP 200 and no server crash.
+        Send POST /add_recipe with empty recipe_name.
+        Assert HTTP 200 and no server crash.
+      </check>
+
+    </checks>
+
+    <pass_condition>
+      All checks return HTTP 200. No 500 errors. Row counts match expected values.
+      Backend is considered stable and ready for frontend integration.
+    </pass_condition>
+
+  </agent>
+
+  <!-- ============================================================
+       EXECUTION ORDER
+  ============================================================ -->
+  <execution_order>
+    <step order="1">Run Agent 1 — generates init_db.py</step>
+    <step order="2">Execute: python init_db.py</step>
+    <step order="3">Run Agent 2 — generates app.py</step>
+    <step order="4">Execute: python app.py (keep running)</step>
+    <step order="5">Run Agent 3 — validates backend pipeline</step>
+    <step order="6">If all Agent 3 checks pass, backend phase is complete. Frontend phase begins in next prompt.</step>
+  </execution_order>
+
+</AGENTS>

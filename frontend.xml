@@ -1,0 +1,161 @@
+  <!-- ============================================================
+       AGENT 2: FLASK APP AGENT
+       Responsible for app.py only.
+  ============================================================ -->
+  <agent id="2" name="FlaskAppAgent">
+    <responsibility>Create app.py. This is the Flask application with all four routes. Depends on Agent 1 having already created the database.</responsibility>
+
+    <output_file>app.py</output_file>
+
+    <dependencies>
+      <dependency agent_id="1">flavorforge.db must exist before this app starts.</dependency>
+    </dependencies>
+
+    <imports>
+      <import>import sqlite3</import>
+      <import>from flask import Flask, request, render_template, render_template_string</import>
+    </imports>
+
+    <app_setup>
+      Define app = Flask(__name__).
+      Define a helper function get_db_connection() that returns a sqlite3.connect("flavorforge.db") connection with row_factory set to sqlite3.Row so columns are accessible by name.
+    </app_setup>
+
+    <routes>
+
+      <route id="2.1" method="GET" path="/">
+        <description>Serves the main page.</description>
+        <logic>
+          Return render_template("index.html").
+          No database call needed.
+        </logic>
+        <returns>Full HTML page.</returns>
+      </route>
+
+      <route id="2.2" method="POST" path="/add_recipe">
+        <description>Adds a new recipe with ingredients and cuisine to the database.</description>
+        <inputs>
+          <input name="recipe_name" source="request.form" type="string"/>
+          <input name="ingredients[]" source="request.form.getlist('ingredients[]')" type="list of strings"/>
+          <input name="cuisine" source="request.form" type="string"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>INSERT INTO Recipes (name, instructions) VALUES (recipe_name, '') and capture lastrowid as recipe_id.</step>
+          <step>
+            For each ingredient in the ingredients list:
+            - Strip whitespace. Skip if empty string.
+            - INSERT OR IGNORE INTO Ingredients (name) VALUES (ingredient).
+            - SELECT id FROM Ingredients WHERE name = ingredient to get ingredient_id.
+            - INSERT OR IGNORE INTO Recipe_Ingredients (recipe_id, ingredient_id) VALUES (recipe_id, ingredient_id).
+          </step>
+          <step>
+            For the cuisine string:
+            - INSERT OR IGNORE INTO Cuisines (name) VALUES (cuisine).
+            - SELECT id FROM Cuisines WHERE name = cuisine to get cuisine_id.
+            - INSERT OR IGNORE INTO Recipe_Cuisines (recipe_id, cuisine_id) VALUES (recipe_id, cuisine_id).
+          </step>
+          <step>Commit and close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet string using render_template_string.
+          Format: a single table row.
+          Example: &lt;tr&gt;&lt;td&gt;{recipe_name}&lt;/td&gt;&lt;td&gt;Added&lt;/td&gt;&lt;/tr&gt;
+        </returns>
+      </route>
+
+      <route id="2.3" method="POST" path="/predictive_match">
+        <description>
+          Takes a list of ingredients the user has on hand.
+          Returns recipes ranked by how many of those ingredients they contain.
+        </description>
+        <inputs>
+          <input name="ingredients[]" source="request.form.getlist('ingredients[]')" type="list of strings"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>
+            Clean the ingredients list: strip whitespace, filter empty strings, lowercase all values.
+          </step>
+          <step>
+            Build a parameterized SQL query.
+            Use a placeholder string for the IN clause based on the length of the list.
+            Example placeholder: (?, ?, ?) for 3 ingredients.
+
+            SQL pattern:
+            SELECT r.name, COUNT(i.name) as match_count
+            FROM Recipes r
+            JOIN Recipe_Ingredients ri ON r.id = ri.recipe_id
+            JOIN Ingredients i ON ri.ingredient_id = i.id
+            WHERE LOWER(i.name) IN ({placeholders})
+            GROUP BY r.id
+            ORDER BY match_count DESC
+          </step>
+          <step>Fetch all results.</step>
+          <step>Close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet using render_template_string.
+          An unordered list of results.
+          Each list item shows recipe name and match count.
+          Example: &lt;li&gt;Pasta Pomodoro — 3 ingredients matched&lt;/li&gt;
+          If no results: &lt;li&gt;No matching recipes found.&lt;/li&gt;
+        </returns>
+      </route>
+
+      <route id="2.4" method="POST" path="/cultural_fusion">
+        <description>
+          Takes two cuisine names.
+          Returns recipes that belong to BOTH cuisines simultaneously.
+          Uses a double-join with HAVING COUNT = 2 strategy.
+        </description>
+        <inputs>
+          <input name="cuisine_a" source="request.form" type="string"/>
+          <input name="cuisine_b" source="request.form" type="string"/>
+        </inputs>
+        <logic>
+          <step>Open db connection.</step>
+          <step>
+            SQL pattern:
+            SELECT r.name
+            FROM Recipes r
+            JOIN Recipe_Cuisines rc ON r.id = rc.recipe_id
+            JOIN Cuisines c ON rc.cuisine_id = c.id
+            WHERE c.name IN (cuisine_a, cuisine_b)
+            GROUP BY r.id
+            HAVING COUNT(DISTINCT c.id) = 2
+
+            Use parameterized query: WHERE c.name IN (?, ?) with (cuisine_a, cuisine_b) as params.
+          </step>
+          <step>Fetch all results.</step>
+          <step>Close connection.</step>
+        </logic>
+        <returns>
+          HTML snippet using render_template_string.
+          A div with a heading and a list of recipe names.
+          Example:
+          &lt;div&gt;
+            &lt;strong&gt;Fusion: Italian + Indian&lt;/strong&gt;
+            &lt;ul&gt;&lt;li&gt;Recipe Name&lt;/li&gt;&lt;/ul&gt;
+          &lt;/div&gt;
+          If no results: &lt;p&gt;No fusion recipes found for these two cuisines.&lt;/p&gt;
+        </returns>
+      </route>
+
+    </routes>
+
+    <app_runner>
+      At the bottom of app.py, under if __name__ == "__main__":
+      Call app.run(debug=True).
+    </app_runner>
+
+    <validation>
+      <check>python app.py must start without errors after init_db.py has been run.</check>
+      <check>GET / must return HTTP 200.</check>
+      <check>POST /add_recipe with valid form data must return a table row HTML string and persist the recipe in the db.</check>
+      <check>POST /predictive_match with ingredients that exist in seed data must return at least one list item.</check>
+      <check>POST /cultural_fusion with cuisine_a=Italian and cuisine_b=Indian must return the fusion div (may be empty list if no cross-cuisine recipes in seed data — that is acceptable).</check>
+      <check>No route should crash on empty input. Handle empty lists gracefully.</check>
+    </validation>
+  </agent>
+
