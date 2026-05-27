@@ -40,19 +40,25 @@ with sqlite3.connect("flavorforge.db") as conn:
     ingredients = [
         "tomato", "garlic", "onion", "chicken", "cumin",
         "cheese", "pasta", "chili", "olive oil", "garam masala",
+        "bell pepper", "mushroom", "yogurt", "lime", "cilantro", "ginger",
     ]
     for name in ingredients:
         conn.execute("INSERT OR IGNORE INTO Ingredients (name) VALUES (?)", (name,))
 
     recipes = [
-        ("Pasta Pomodoro",    "tomato,garlic,pasta,olive oil",     "Italian"),
-        ("Chicken Tikka",     "chicken,garlic,garam masala,onion", "Indian"),
-        ("Tacos al Carbon",   "chicken,cumin,chili,onion",         "Mexican"),
-        ("Margherita Base",   "tomato,garlic,cheese,olive oil",    "Italian"),
-        ("Dal Tadka",         "cumin,garlic,onion,garam masala",   "Indian"),
+        ("Pasta Pomodoro",      "tomato,garlic,pasta,olive oil",          ("Italian",)),
+        ("Chicken Tikka",       "chicken,garlic,garam masala,onion",      ("Indian",)),
+        ("Tacos al Carbon",     "chicken,cumin,chili,onion",              ("Mexican",)),
+        ("Margherita Base",     "tomato,garlic,cheese,olive oil",         ("Italian",)),
+        ("Dal Tadka",           "cumin,garlic,onion,garam masala",        ("Indian",)),
+        ("Tandoori Pizza",      "tomato,chicken,cheese,garam masala",     ("Italian","Indian")),
+        ("Veggie Supreme",      "tomato,bell pepper,mushroom,garlic",     ("Italian",)),
+        ("Butter Chicken",      "chicken,tomato,garam masala,yogurt",     ("Indian",)),
+        ("Chicken Tortilla Soup","chicken,tomato,chili,lime,cilantro",    ("Mexican",)),
+        ("Tikka Quesadilla",    "chicken,cheese,chili,lime",              ("Mexican","Indian")),
     ]
 
-    for recipe_name, ingredient_str, cuisine_name in recipes:
+    for recipe_name, ingredient_str, cuisines in recipes:
         cur = conn.execute(
             "INSERT OR IGNORE INTO Recipes (name, instructions) VALUES (?, ?)",
             (recipe_name, ""),
@@ -78,14 +84,15 @@ with sqlite3.connect("flavorforge.db") as conn:
                     (recipe_id, row[0]),
                 )
 
-        cuisine_row = conn.execute(
-            "SELECT id FROM Cuisines WHERE name = ?", (cuisine_name,)
-        ).fetchone()
-        if cuisine_row is not None:
-            conn.execute(
-                "INSERT OR IGNORE INTO Recipe_Cuisines (recipe_id, cuisine_id) VALUES (?, ?)",
-                (recipe_id, cuisine_row[0]),
-            )
+        for cuisine_name in cuisines:
+            cuisine_row = conn.execute(
+                "SELECT id FROM Cuisines WHERE name = ?", (cuisine_name,)
+            ).fetchone()
+            if cuisine_row is not None:
+                conn.execute(
+                    "INSERT OR IGNORE INTO Recipe_Cuisines (recipe_id, cuisine_id) VALUES (?, ?)",
+                    (recipe_id, cuisine_row[0]),
+                )
 
     conn.commit()
 
