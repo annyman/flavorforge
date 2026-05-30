@@ -20,6 +20,9 @@ venv/
 *.swp
 *.swo
 
+# Session files
+session
+
 # OS
 .DS_Store
 Thumbs.db
