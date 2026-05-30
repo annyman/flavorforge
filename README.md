@@ -1,15 +1,15 @@
-# FlavorForge
+# 🍽️ FlavorForge
 
 A Flask + SQLite recipe app with **predictive ingredient matching** and **cultural fusion** queries, powered by HTMX on the frontend.
 
-## Features
+## ✨ Features
 
-- **Predictive Match** — Input ingredients you have; get recipes ranked by how many of those ingredients they use.
-- **Cultural Fusion** — Find recipes that belong to two cuisines simultaneously (e.g. Italian × Indian).
-- **Add Recipes** — Dynamically add new recipes with ingredients and cuisine tags.
-- **View All Recipes** — Browse the full recipe catalog with a single click.
+- 🔍 **Predictive Match** — Input ingredients you have; get recipes ranked by how many of those ingredients they use.
+- 🌍 **Cultural Fusion** — Find recipes that belong to two cuisines simultaneously (e.g. Italian × Indian).
+- ➕ **Add Recipes** — Dynamically add new recipes with ingredients and cuisine tags.
+- 📖 **View All Recipes** — Browse the full recipe catalog with a single click.
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer     | Technology   |
 |-----------|--------------|
@@ -17,7 +17,7 @@ A Flask + SQLite recipe app with **predictive ingredient matching** and **cultur
 | Database  | SQLite3 (raw `sqlite3` module, no ORM) |
 | Frontend  | HTMX 2.x, vanilla CSS |
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
 # Clone the repo
@@ -40,7 +40,7 @@ python app.py
 
 Open http://127.0.0.1:5000 in your browser.
 
-## Database Schema
+## 🗄️ Database Schema
 
 - `Recipes` — id, name, instructions
 - `Ingredients` — id, name (unique)
@@ -50,6 +50,6 @@ Open http://127.0.0.1:5000 in your browser.
 
 The schema is defined in `init_db.py` and seeds 10 recipes, 16 ingredients, and 3 cuisines.
 
-## License
+## 📄 License
 
 MIT
