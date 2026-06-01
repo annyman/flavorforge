@@ -15,12 +15,21 @@
     <h2>🥗 Add Recipe</h2>
     <form hx-post="/add_recipe" hx-target="#add-result" hx-swap="innerHTML">
       <label>Recipe Name</label>
-      <input type="text" name="recipe_name" placeholder="e.g. Mushroom Risotto" required>
+      <input type="text" name="recipe_name" placeholder="e.g. Spicy Thai Basil Chicken" required>
+      <span class="hint">Try: <strong>Mushroom Broth Soup</strong>, <strong>Spicy Vegan Curry</strong></span>
 
-      <label>Ingredients</label>
+      <label>Ingredients (existing: tomato, garlic, onion, chicken, cumin, cheese, pasta, chili, olive oil, garam masala, bell pepper, mushroom, yogurt, lime, cilantro, ginger, basil, broth)</label>
       <div id="ingredient-list">
         <div class="ingredient-row">
-          <input type="text" name="ingredients[]" placeholder="tomato">
+          <input type="text" name="ingredients[]" placeholder="e.g. mushroom">
+          <button type="button" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        <div class="ingredient-row">
+          <input type="text" name="ingredients[]" placeholder="e.g. garlic">
+          <button type="button" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        <div class="ingredient-row">
+          <input type="text" name="ingredients[]" placeholder="e.g. broth">
           <button type="button" onclick="this.parentElement.remove()">&times;</button>
         </div>
       </div>
@@ -28,6 +37,15 @@
 
       <label>Cuisine</label>
       <input type="text" name="cuisine" placeholder="e.g. Italian" required>
+      <span class="hint">Existing: <strong>Italian</strong>, <strong>Indian</strong>, <strong>Mexican</strong>, <strong>Thai</strong> — or type a new one</span>
+
+      <label>Tags (comma-separated, optional)</label>
+      <input type="text" name="tags" placeholder="e.g. Vegetarian, Quick-Prep">
+      <span class="hint">Existing: <strong>Vegetarian</strong>, <strong>Vegan</strong>, <strong>High-Protein</strong>, <strong>Quick-Prep</strong>, <strong>Gluten-Free</strong>, <strong>Spicy</strong></span>
+
+      <label>Steps (one per line, optional)</label>
+      <textarea name="steps" placeholder="Sauté mushrooms and garlic in butter.&#10;Add rice and toast for 2 minutes.&#10;Slowly add broth while stirring.&#10;Finish with parmesan and serve."></textarea>
+      <span class="hint">Each line becomes a numbered step in order</span>
 
       <button type="submit" class="btn btn-primary">Submit Recipe</button>
     </form>
@@ -41,12 +59,21 @@
       <label>Ingredients I Have</label>
       <div id="match-ingredient-list">
         <div class="ingredient-row">
-          <input type="text" name="ingredients[]" placeholder="tomato">
+          <input type="text" name="ingredients[]" placeholder="e.g. tomato">
+          <button type="button" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        <div class="ingredient-row">
+          <input type="text" name="ingredients[]" placeholder="e.g. chicken">
+          <button type="button" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        <div class="ingredient-row">
+          <input type="text" name="ingredients[]" placeholder="e.g. garlic">
           <button type="button" onclick="this.parentElement.remove()">&times;</button>
         </div>
       </div>
       <button type="button" class="btn btn-add" onclick="addMatchIngredient()">+ Add Ingredient</button>
       <button type="submit" class="btn btn-primary">Find Recipes</button>
+      <span class="hint">Recipes ranked by how many ingredients match — <strong>tomato, chicken, garlic</strong> scores <strong>Ultimate Loaded Pizza</strong> #1</span>
     </form>
     <div id="match-result" class="result"></div>
   </div>
@@ -57,8 +84,10 @@
     <form hx-post="/cultural_fusion" hx-target="#fusion-result" hx-swap="innerHTML">
       <label>Cuisine A</label>
       <input type="text" name="cuisine_a" placeholder="e.g. Italian" required>
+      <span class="hint">Try <strong>Italian</strong>, <strong>Indian</strong>, <strong>Mexican</strong>, <strong>Thai</strong></span>
       <label>Cuisine B</label>
       <input type="text" name="cuisine_b" placeholder="e.g. Indian" required>
+      <span class="hint">Try <strong>Indian</strong> with Italian → <strong>Tandoori Pizza</strong>; Mexican with Indian → <strong>Tikka Quesadilla</strong></span>
       <button type="submit" class="btn btn-primary">Find Fusion</button>
     </form>
     <div id="fusion-result" class="result"></div>
@@ -71,6 +100,52 @@
       Refresh List
     </button>
     <div id="recipes-result" class="result"></div>
+  </div>
+
+  <!-- ========== TAG BROWSER ========== -->
+  <div class="card">
+    <h2>🏷️ Tag Browser</h2>
+    <div hx-get="/recipes_by_tag" hx-trigger="load" hx-target="#tag-results" hx-swap="innerHTML"></div>
+    <div id="tag-results" class="result"></div>
+  </div>
+
+  <!-- ========== ADD TAG ========== -->
+  <div class="card">
+    <h2>➕ Add Tag</h2>
+    <form hx-post="/add_tag" hx-target="#add-tag-result" hx-swap="innerHTML">
+      <label>Recipe ID</label>
+      <input type="number" name="recipe_id" placeholder="e.g. 11" required>
+      <span class="hint">Use IDs from <strong>All Recipes</strong> table — e.g. <strong>11</strong> = Spicy Thai Basil Chicken</span>
+      <label>Tag Name</label>
+      <input type="text" name="tag_name" placeholder="e.g. Nut-Free" required>
+      <span class="hint">Existing tags: <strong>Vegetarian</strong>, <strong>Vegan</strong>, <strong>High-Protein</strong>, <strong>Quick-Prep</strong>, <strong>Gluten-Free</strong>, <strong>Spicy</strong> — or create a new one</span>
+      <button type="submit" class="btn btn-primary">Add Tag</button>
+    </form>
+    <div id="add-tag-result" class="result"></div>
+  </div>
+
+  <!-- ========== PREPARATION STEPS ========== -->
+  <div class="card">
+    <h2>📝 Preparation Steps</h2>
+    <form hx-get="/recipe_steps" hx-target="#steps-output" hx-swap="innerHTML">
+      <label>Recipe ID</label>
+      <input type="number" name="recipe_id" placeholder="e.g. 13" required>
+      <span class="hint"><strong>13</strong> = Ultimate Loaded Pizza (6 steps), <strong>12</strong> = Simple Vegan Salad (1 step)</span>
+      <button type="submit" class="btn btn-refresh">View Steps</button>
+    </form>
+    <hr>
+    <form hx-post="/add_step" hx-target="#steps-output" hx-swap="innerHTML">
+      <label>Recipe ID</label>
+      <input type="number" name="recipe_id" placeholder="e.g. 11" required>
+      <span class="hint"><strong>11</strong> = Spicy Thai Basil Chicken, <strong>15</strong> = Spicy Vegan Curry</span>
+      <label>Step Number</label>
+      <input type="number" name="step_number" placeholder="e.g. 5" required>
+      <span class="hint">Inserts/replaces this step number in the sequence</span>
+      <label>Instruction</label>
+      <textarea name="instruction" placeholder="e.g. Garnish with fresh cilantro and serve with lime wedges." required></textarea>
+      <button type="submit" class="btn btn-primary">Add Step</button>
+    </form>
+    <div id="steps-output" class="result"></div>
   </div>
 
   <script>

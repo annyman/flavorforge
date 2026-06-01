@@ -45,4 +45,23 @@ input[type="text"]::placeholder { color: #9ca0b0; }
   padding: .5rem; border-bottom: 1px solid #ccd0da; text-align: left;
 }
 .result th { background: #ccd0da; font-weight: 600; color: #7287fd; }
-hr { margin: 2rem 0; border: none; border-top: 1px solid #ccd0da; }
+hr { margin: 1rem 0; border: none; border-top: 1px solid #ccd0da; }
+textarea {
+  width: 100%; padding: .5rem; border: 1px solid #bcc0cc;
+  border-radius: 4px; margin-top: .25rem; min-height: 80px;
+  background: #eff1f5; color: #4c4f69; font-family: system-ui, sans-serif;
+  resize: vertical;
+}
+textarea::placeholder { color: #9ca0b0; }
+.tag-chip {
+  display: inline-block; margin: .25rem; padding: .25rem .75rem;
+  border-radius: 999px; background: #8839ef; color: #eff1f5;
+  font-size: .875rem; font-weight: 600; cursor: pointer;
+  transition: opacity .15s;
+}
+.tag-chip:hover { opacity: .8; }
+.step-item { padding: .5rem 0; border-bottom: 1px solid #ccd0da; line-height: 1.5; }
+.step-item:last-child { border-bottom: none; }
+.error { color: #d20f39; font-weight: 600; }
+.hint { display: block; margin-top: .25rem; font-size: .8rem; color: #9ca0b0; }
+.hint strong { color: #7287fd; }
