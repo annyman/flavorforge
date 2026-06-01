@@ -21,3 +21,30 @@ GROUP BY r.id
 HAVING COUNT(DISTINCT c.id) = 2
 
 *Logic*: "Which recipes belong to both cuisines simultaneously?"
+
+**Recipes by Tag — tag-filtered listing:**
+------------------------------------------
+SELECT r.name
+FROM Recipes r
+JOIN Recipe_Tags rt ON r.id = rt.recipe_id
+JOIN Tags t ON rt.tag_id = t.id
+WHERE t.name = ?
+ORDER BY r.name
+
+*Logic*: "Show all recipes that have a given tag."
+
+**Recipe Steps — ordered preparation steps:**
+---------------------------------------------
+SELECT step_number, instruction
+FROM Preparation_Steps
+WHERE recipe_id = ?
+ORDER BY step_number ASC
+
+*Logic*: "Fetch the step-by-step instructions for a recipe in order."
+
+**Add Step — upsert a preparation step:**
+-----------------------------------------
+INSERT OR REPLACE INTO Preparation_Steps (recipe_id, step_number, instruction)
+VALUES (?, ?, ?)
+
+*Logic*: "Insert or replace a step at a given position — handles re-ordering."
